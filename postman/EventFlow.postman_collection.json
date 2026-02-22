@@ -1,0 +1,88 @@
+{
+	"info": {
+		"_postman_id": "eventflow-collection",
+		"name": "EventFlow API",
+		"description": "EventFlow event ingestion and metrics API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080"
+		}
+	],
+	"item": [
+		{
+			"name": "Health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/health",
+					"host": ["{{baseUrl}}"],
+					"path": ["health"]
+				},
+				"description": "Health check. Returns 200 if DB is reachable."
+			}
+		},
+		{
+			"name": "Create Event",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"user_id\": \"1\",\n  \"event_name\": \"click\",\n  \"timestamp\": 1771718400,\n  \"channel\": \"web\",\n  \"campaign_id\": \"camp1\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/events",
+					"host": ["{{baseUrl}}"],
+					"path": ["events"]
+				},
+				"description": "Create event. Returns 202 Accepted. Duplicate (same idempotency key) returns 409."
+			}
+		},
+		{
+			"name": "Get Metrics",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/metrics?event_name=click&from=1771545600&to=1771718400",
+					"host": ["{{baseUrl}}"],
+					"path": ["metrics"],
+					"query": [
+						{"key": "event_name", "value": "click"},
+						{"key": "from", "value": "1771545600"},
+						{"key": "to", "value": "1771718400"}
+					]
+				},
+				"description": "Get aggregated metrics. Required: event_name, from, to (Unix timestamps)."
+			}
+		},
+		{
+			"name": "Get Metrics (group_by=channel)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/metrics?event_name=click&from=1771545600&to=1771718400&group_by=channel",
+					"host": ["{{baseUrl}}"],
+					"path": ["metrics"],
+					"query": [
+						{"key": "event_name", "value": "click"},
+						{"key": "from", "value": "1771545600"},
+						{"key": "to", "value": "1771718400"},
+						{"key": "group_by", "value": "channel"}
+					]
+				},
+				"description": "Get metrics grouped by channel. Returns buckets array."
+			}
+		}
+	]
+}

@@ -6,8 +6,9 @@ import (
 )
 
 type Config struct {
-	HTTPPort int
-	DB       DBConfig
+	HTTPPort      int
+	CacheTTLSeconds int
+	DB            DBConfig
 }
 
 // db context url holding the connection
@@ -18,7 +19,8 @@ type DBConfig struct {
 // load config from env variables
 func Load() *Config {
 	return &Config{
-		HTTPPort: getEnvInt("HTTP_PORT", 8080),
+		HTTPPort:        getEnvInt("HTTP_PORT", 8080),
+		CacheTTLSeconds: getEnvInt("CACHE_TTL_SECONDS", 60),
 		DB: DBConfig{
 			URL: getEnv("DATABASE_URL", "postgres://eventflow:eventflow@localhost:5432/eventflow?sslmode=disable"),
 		},

@@ -2,23 +2,45 @@ package get_metrics
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"eventflow/infra/contracts"
+	"eventflow/middleware/cache"
 )
 
 // Service orchestrates the get metrics use case.
 type Service struct {
-	repo contracts.MetricsRepository
+	repo   contracts.MetricsRepository
+	cache  cache.Cache
+	cacheTTL time.Duration
 }
 
 // NewService returns a new GetMetricsService.
-func NewService(repo contracts.MetricsRepository) *Service {
-	return &Service{repo: repo}
+func NewService(repo contracts.MetricsRepository, c cache.Cache, cacheTTL time.Duration) *Service {
+	return &Service{
+		repo:     repo,
+		cache:    c,
+		cacheTTL: cacheTTL,
+	}
+}
+
+// cacheKey builds a unique key for the metrics request.
+func cacheKey(req *GetMetricsRequest) string {
+	return fmt.Sprintf("metrics:%s|%d|%d|%s", req.EventName, req.From, req.To, req.GroupBy)
 }
 
 // Handle returns aggregated metrics for the given request.
 func (s *Service) Handle(ctx context.Context, req *GetMetricsRequest) (*GetMetricsResponse, error) {
+	key := cacheKey(req)
+	if v, ok := s.cache.Get(key); ok {
+		if resp, ok := v.(*GetMetricsResponse); ok {
+			slog.Debug("get_metrics: cache hit", "key", key)
+			return resp, nil
+		}
+	}
+
 	slog.Debug(
 		QueryMsg,
 		"event_name", req.EventName,
@@ -77,5 +99,6 @@ func (s *Service) Handle(ctx context.Context, req *GetMetricsRequest) (*GetMetri
 		}
 	}
 
+	s.cache.Set(key, resp, s.cacheTTL)
 	return resp, nil
 }
