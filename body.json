@@ -1,7 +1,0 @@
-﻿{"event_name":"product_view",
-"user_id":"user_123",
-"timestamp":1723475612,
-"channel":"web",
-"campaign_id":"campaign_123",
-"tags":["tag1","tag2"],
-"metadata":{"key1":"value1","key2":"value2"}}
