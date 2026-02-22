@@ -5,8 +5,9 @@ import (
 	"eventflow/infra/domain"
 )
 
+// EventStore extends Repository with event-specific operations.
 type EventStore interface {
+	BaseContract[*domain.Event]
 	Exists(ctx context.Context, idempotencyKey string) (bool, error)
-	Insert(ctx context.Context, e *domain.Event) error
 	InsertBatch(ctx context.Context, events []*domain.Event) error
 }

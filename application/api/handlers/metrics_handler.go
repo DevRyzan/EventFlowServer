@@ -1,56 +1,49 @@
 package handlers
 
 import (
-	"net/http" 
-	"eventflow/infra/domain" 
+	"log/slog"
+	"net/http"
+
+	"eventflow/application/metrics"
+	"eventflow/infra/domain"
+
 	"github.com/labstack/echo/v4"
 )
 
-// MetricsHandler will hadnle the metrics endpoint
+// MetricsHandler handles the metrics endpoint.
 type MetricsHandler struct {
-	service interface {
-		Get(
-			ctx echo.Context, 
-			req *domain.MetricsRequest,
-		) (*domain.MetricsResponse, error)
-	}
+	service *metrics.Service
 }
 
-// NewMetricsHandler will create a new MetricsHandler
-func NewMetricsHandler(service interface {
-	Get(
-		ctx echo.Context, 
-		req *domain.MetricsRequest,
-	) (*domain.MetricsResponse, error)
-}) *MetricsHandler {
+// NewMetricsHandler creates a new MetricsHandler.
+func NewMetricsHandler(service *metrics.Service) *MetricsHandler {
 	return &MetricsHandler{service: service}
 }
 
-// GET /metrics.
-func (h *MetricsHandler) Get(
-	c echo.Context,
-) (err error) {
+// Get handles GET /metrics.
+func (h *MetricsHandler) Get(c echo.Context) error {
 	var req domain.MetricsRequest
 	if err := c.Bind(&req); err != nil {
+		slog.Warn("metrics get: invalid query params", "err", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid query params"})
 	}
 
 	if err := validateMetricsRequest(&req); err != nil {
+		slog.Warn("metrics get: validation failed", "event_name", req.EventName, "err", err)
 		return err
 	}
 
-	resp, err := h.service.Get(c, &req)
+	resp, err := h.service.Get(c.Request().Context(), &req)
 	if err != nil {
+		slog.Error("metrics get: internal error", "event_name", req.EventName, "err", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
 
+	slog.Info("metrics get: success", "event_name", req.EventName, "total_count", resp.TotalCount)
 	return c.JSON(http.StatusOK, resp)
 }
 
-// validation for the metrics request
-func validateMetricsRequest(
-	req *domain.MetricsRequest,
-) error {
+func validateMetricsRequest(req *domain.MetricsRequest) error {
 	if req.EventName == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "event_name is required")
 	}

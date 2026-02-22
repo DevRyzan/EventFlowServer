@@ -1,54 +1,54 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
-	"eventflow/infra/contracts"
-	"eventflow/infra/dto"
+	commands "eventflow/application/dtos/commands"
+	"eventflow/application/events"
 
 	"github.com/labstack/echo/v4"
 )
 
-// EventsHandler will handle the events endpoint.
+// EventsHandler handles the events endpoint.
 type EventsHandler struct {
-	store contracts.EventStore
+	service *events.Service
 }
 
-// NewEventsHandler will create a new EventsHandler
-func NewEventsHandler(store contracts.EventStore) *EventsHandler {
-	return &EventsHandler{store: store}
+// NewEventsHandler creates a new EventsHandler.
+func NewEventsHandler(service *events.Service) *EventsHandler {
+	return &EventsHandler{service: service}
 }
 
-// POST /events.
+// Create handles POST /events.
 func (h *EventsHandler) Create(c echo.Context) error {
-	var req dto.CreateEventRequest
+	var req commands.CreateEventRequest
 	if err := c.Bind(&req); err != nil {
+		slog.Warn("event create: invalid request body", "err", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	if err := validateEventRequest(&req); err != nil {
+		slog.Warn("event create: validation failed", "event_name", req.EventName, "user_id", req.UserId, "err", err)
 		return err
 	}
 
-	event := req.ToDomain()
 	ctx := c.Request().Context()
-	exists, err := h.store.Exists(ctx, event.IdempotencyKey())
+	resp, err := h.service.Create(ctx, &req)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
-	}
-	if exists {
-		return c.JSON(http.StatusConflict, map[string]string{"error": "duplicate event"})
-	}
-
-	if err := h.store.Insert(ctx, event); err != nil {
+		if err == events.ErrDuplicate {
+			slog.Info("event create: duplicate rejected", "event_name", req.EventName, "user_id", req.UserId)
+			return c.JSON(http.StatusConflict, map[string]string{"error": "duplicate event"})
+		}
+		slog.Error("event create: internal error", "event_name", req.EventName, "err", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
 
-	return c.JSON(http.StatusAccepted, dto.CreateEventResponse{Status: "accepted"})
+	slog.Info("event create: accepted", "event_name", req.EventName, "user_id", req.UserId)
+	return c.JSON(http.StatusAccepted, resp)
 }
 
-// validateEventRequest validates the DTO request.
-func validateEventRequest(req *dto.CreateEventRequest) error {
+func validateEventRequest(req *commands.CreateEventRequest) error {
 	if req.EventName == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "event_name is required")
 	}
