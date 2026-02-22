@@ -1,0 +1,3 @@
+GORM: used for model-based CRUD and simple queries.
+
+Raw SQL: used when GORM can’t express the query (e.g. COUNT(DISTINC) COALESCE, custom aggregations).
