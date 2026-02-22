@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"log/slog"
 
 	"eventflow/infra/contracts"
 	"eventflow/infra/domain/dbmodels"
@@ -23,7 +24,7 @@ func NewPostgresMetricsRepository(db *gorm.DB) contracts.MetricsRepository {
 func (r *PostgresMetricsRepository) GetTotalCount(ctx context.Context, params contracts.MetricsQueryParams) (int64, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&dbmodels.EventModel{}).
-		Where("event_name = ? AND event_timestamp >= ? AND event_timestamp <= ?", params.EventName, params.From, params.To).
+		Where(GetTotalCountQuery, params.EventName, params.From, params.To).
 		Count(&count).Error
 	return count, err
 }
@@ -32,7 +33,7 @@ func (r *PostgresMetricsRepository) GetTotalCount(ctx context.Context, params co
 func (r *PostgresMetricsRepository) GetUniqueUserCount(ctx context.Context, params contracts.MetricsQueryParams) (int64, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Raw(
-		"SELECT COUNT(DISTINCT user_id) FROM events WHERE event_name = ? AND event_timestamp >= ? AND event_timestamp <= ?",
+		GetUniqueUserCountQuery,
 		params.EventName, params.From, params.To,
 	).Scan(&count).Error
 	return count, err
@@ -45,10 +46,17 @@ func (r *PostgresMetricsRepository) GetGroupedByChannel(ctx context.Context, par
 		Count int64
 	}
 	err := r.db.WithContext(ctx).Raw(
-		"SELECT COALESCE(channel, '(empty)') as key, COUNT(*) as count FROM events WHERE event_name = ? AND event_timestamp >= ? AND event_timestamp <= ? GROUP BY COALESCE(channel, '(empty)')",
+		GetGroupedByChannelQuery,
 		params.EventName, params.From, params.To,
 	).Scan(&rows).Error
 	if err != nil {
+		slog.Error(
+			GetGroupedByChannelFailedError,
+			"event_name", params.EventName,
+			"from", params.From,
+			"to", params.To,
+			"err", err,
+		)
 		return nil, err
 	}
 	buckets := make([]contracts.BucketRow, len(rows))

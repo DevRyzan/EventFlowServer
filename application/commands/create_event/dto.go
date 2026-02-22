@@ -1,4 +1,4 @@
-package commands
+package create_event
 
 import "eventflow/infra/domain"
 
