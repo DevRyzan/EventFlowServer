@@ -1,6 +1,6 @@
-package events
+package create_event
 
 import "errors"
 
 // ErrDuplicate is returned when an event with the same idempotency key already exists.
-var ErrDuplicate = errors.New("duplicate event")
+var ErrDuplicate = errors.New(DuplicateEventError)
