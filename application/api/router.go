@@ -2,27 +2,22 @@ package api
 
 import (
 	"eventflow/application/api/handlers"
-	"eventflow/infra/contracts"
-	"eventflow/infra/domain"
+	"eventflow/application/api/middleware"
+	"eventflow/application/events"
+	"eventflow/application/metrics"
 
 	"github.com/labstack/echo/v4"
 )
 
-// MetricsService providing the metrics endpoint.
-type MetricsService interface {
-	Get(
-		ctx echo.Context, 
-		req *domain.MetricsRequest,
-	) (*domain.MetricsResponse, error)
-}
-
 // Router sets up Echo routes.
 func Router(
-	e *echo.Echo, 
-	eventStore contracts.EventStore, 
-	metricsService MetricsService,
+	e *echo.Echo,
+	eventService *events.Service,
+	metricsService *metrics.Service,
 ) {
-	eventsHandler := handlers.NewEventsHandler(eventStore)
+	e.Use(middleware.RequestLogger())
+
+	eventsHandler := handlers.NewEventsHandler(eventService)
 	metricsHandler := handlers.NewMetricsHandler(metricsService)
 
 	e.POST("/events", eventsHandler.Create)

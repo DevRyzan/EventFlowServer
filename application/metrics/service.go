@@ -1,41 +1,42 @@
 package metrics
 
 import (
-	"eventflow/infra/domain"
-	"eventflow/infra/domain/dbmodels"
+	"context"
+	"log/slog"
 
-	"github.com/labstack/echo/v4"
-	"gorm.io/gorm"
+	"eventflow/infra/contracts"
+	"eventflow/infra/domain"
 )
 
-// Service implements metrics aggregation.
+// Service orchestrates metrics aggregation use cases.
 type Service struct {
-	db *gorm.DB
+	repo contracts.MetricsRepository
 }
 
 // NewService returns a new metrics Service.
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(repo contracts.MetricsRepository) *Service {
+	return &Service{repo: repo}
 }
 
 // Get returns aggregated metrics for the given request.
-func (s *Service) Get(c echo.Context, req *domain.MetricsRequest) (*domain.MetricsResponse, error) {
-	ctx := c.Request().Context()
+func (s *Service) Get(ctx context.Context, req *domain.MetricsRequest) (*domain.MetricsResponse, error) {
+	slog.Debug("metrics service: query", "event_name", req.EventName, "from", req.From, "to", req.To)
+	params := contracts.MetricsQueryParams{
+		EventName: req.EventName,
+		From:      req.From,
+		To:        req.To,
+		GroupBy:   req.GroupBy,
+	}
 
-	var totalCount int64
-	err := s.db.WithContext(ctx).Model(&dbmodels.EventModel{}).
-		Where("event_name = ? AND event_timestamp >= ? AND event_timestamp <= ?", req.EventName, req.From, req.To).
-		Count(&totalCount).Error
+	totalCount, err := s.repo.GetTotalCount(ctx, params)
 	if err != nil {
+		slog.Error("metrics service: get total count failed", "event_name", req.EventName, "err", err)
 		return nil, err
 	}
 
-	var uniqueUserCount int64
-	err = s.db.WithContext(ctx).Raw(
-		"SELECT COUNT(DISTINCT user_id) FROM events WHERE event_name = ? AND event_timestamp >= ? AND event_timestamp <= ?",
-		req.EventName, req.From, req.To,
-	).Scan(&uniqueUserCount).Error
+	uniqueUserCount, err := s.repo.GetUniqueUserCount(ctx, params)
 	if err != nil {
+		slog.Error("metrics service: get unique user count failed", "event_name", req.EventName, "err", err)
 		return nil, err
 	}
 
@@ -46,20 +47,13 @@ func (s *Service) Get(c echo.Context, req *domain.MetricsRequest) (*domain.Metri
 	}
 
 	if req.GroupBy == "channel" {
-		type channelRow struct {
-			Key   string
-			Count int64
-		}
-		var rows []channelRow
-		err = s.db.WithContext(ctx).Raw(
-			"SELECT COALESCE(channel, '(empty)') as key, COUNT(*) as count FROM events WHERE event_name = ? AND event_timestamp >= ? AND event_timestamp <= ? GROUP BY COALESCE(channel, '(empty)')",
-			req.EventName, req.From, req.To,
-		).Scan(&rows).Error
+		buckets, err := s.repo.GetGroupedByChannel(ctx, params)
 		if err != nil {
+			slog.Error("metrics service: get grouped by channel failed", "event_name", req.EventName, "err", err)
 			return nil, err
 		}
-		for _, r := range rows {
-			resp.Buckets = append(resp.Buckets, domain.Bucket{Key: r.Key, Count: r.Count})
+		for _, b := range buckets {
+			resp.Buckets = append(resp.Buckets, domain.Bucket{Key: b.Key, Count: b.Count})
 		}
 	}
 
