@@ -1,12 +1,48 @@
 services:
-  app:
-    build: .
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
     env_file: .env
     ports:
-      - "${HTTP_PORT:-8080}:8080"
+      - "${GATEWAY_PORT:-8080}:8080"
+    environment:
+      GATEWAY_PORT: ${GATEWAY_PORT:-8080}
+      BACKEND_URLS: ${BACKEND_URLS:-http://app1:8080,http://app2:8080,http://app3:8080}
+    depends_on:
+      app1:
+        condition: service_started
+      app2:
+        condition: service_started
+      app3:
+        condition: service_started
+
+  app1:
+    build: .
+    env_file: .env
     environment:
       HTTP_PORT: 8080
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app2:
+    build: .
+    env_file: .env
+    environment:
+      HTTP_PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app3:
+    build: .
+    env_file: .env
+    environment:
+      HTTP_PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
     depends_on:
       postgres:
         condition: service_healthy
