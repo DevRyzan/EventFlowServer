@@ -6,6 +6,7 @@ import (
 
 	"eventflow/infra/contracts"
 	"eventflow/infra/domain"
+	"eventflow/infra/domain/dbmodels"
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -22,7 +23,7 @@ func NewPostgresEventStore(db *gorm.DB) contracts.EventStore {
 
 func (s *PostgresEventStore) Exists(ctx context.Context, idempotencyKey string) (bool, error) {
 	var count int64
-	err := s.db.WithContext(ctx).Model(&domain.EventModel{}).
+	err := s.db.WithContext(ctx).Model(&dbmodels.EventModel{}).
 		Where("idempotency_key = ?", idempotencyKey).
 		Count(&count).Error
 	return count > 0, err
@@ -39,7 +40,7 @@ func (s *PostgresEventStore) InsertBatch(ctx context.Context, events []*domain.E
 	if len(events) == 0 {
 		return nil
 	}
-	models := make([]domain.EventModel, len(events))
+	models := make([]dbmodels.EventModel, len(events))
 	for i, e := range events {
 		models[i] = domainToModel(e)
 	}
@@ -48,10 +49,10 @@ func (s *PostgresEventStore) InsertBatch(ctx context.Context, events []*domain.E
 		CreateInBatches(models, 100).Error
 }
 
-func domainToModel(e *domain.Event) domain.EventModel {
+func domainToModel(e *domain.Event) dbmodels.EventModel {
 	tagsJSON, _ := json.Marshal(e.Tags)
 	metadataJSON, _ := json.Marshal(e.Metadata)
-	return domain.EventModel{
+	return dbmodels.EventModel{
 		IdempotencyKey: e.IdempotencyKey(),
 		EventName:      e.EventName,
 		UserID:         e.UserId,

@@ -16,7 +16,7 @@ type EventModel struct {
 	CampaignID     string         `gorm:"column:campaign_id"`
 	Tags           datatypes.JSON `gorm:"column:tags;type:jsonb"`
 	Metadata       datatypes.JSON `gorm:"column:metadata;type:jsonb"`
-	CreatedAt      time.Time      `gorm:"column:created_at;->"` // read-only, DB default
+	CreatedAt      time.Time      `gorm:"column:created_at;->"`
 }
 
 // TableName overrides GORM's default table name.
