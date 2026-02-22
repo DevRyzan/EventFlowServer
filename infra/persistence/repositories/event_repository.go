@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 
 	"eventflow/infra/contracts"
 	"eventflow/infra/domain"
@@ -41,6 +42,10 @@ func (s *PostgresEventStore) GetByID(ctx context.Context, id string) (*domain.Ev
 	var m dbmodels.EventModel
 	err := s.db.WithContext(ctx).Where("idempotency_key = ?", id).First(&m).Error
 	if err != nil {
+		slog.Error(
+			GetbyIdFailedError,
+			"id", id,
+			"err", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, contracts.ErrNotFound
 		}
@@ -59,6 +64,11 @@ func (s *PostgresEventStore) Delete(ctx context.Context, id string) error {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
+		slog.Error(
+			DeleteFailedError,
+			"id", id,
+			"err", contracts.ErrNotFound,
+		)
 		return contracts.ErrNotFound
 	}
 	return nil
